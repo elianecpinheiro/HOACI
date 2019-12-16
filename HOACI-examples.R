@@ -43,6 +43,7 @@ orange_oil <- orange[,3]
 density    <- density * 1000
 arabic_gum <- arabic_gum / 100
 orange_oil <- orange_oil / 100
+orange<-cbind(density,arabic_gum,orange_oil)
 orange<-data.frame(orange)
 names(orange)<-c("density","arabic_gum","orange_oil")
 orange
