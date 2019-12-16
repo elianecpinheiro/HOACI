@@ -289,10 +289,10 @@ simula_hoaci <- function(s_vY, s_mX, s_mZ, parameter, psi, prob, r){
 }
 
 # ----Defining the file names---------------------------------------------------
-filenameestimates<-paste("estimates_psi",psi,"_prob",prob*1000,".txt",sep="")
-filenamecoverage<-paste("coverage_psi",psi,"_prob",prob*1000,".txt",sep="")
-filenamemensagem <-paste("message_psi",psi,"_prob",prob*1000,".txt",sep="")
-filenamefail <-paste("fail_psi",psi,"_prob",prob*1000,".txt",sep="")
+filenameestimates<-paste("estimates_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamecoverage<-paste("coverage_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamemensagem <-paste("message_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamefail <-paste("fail_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
 
 ## ----Genereting samples--------------------------------------------------------
 theta<-c(beta,gamma)
@@ -320,7 +320,7 @@ start.time <- Sys.time()
 ## ----Alocating Processors------------------------------------------------------
 closeAllConnections()
 ncores <- detectCores()
-cat("\n ncores = ",ncores,"\n")
+cat("\n ncores = ",ncores,"\n\n")
 cl <- makeCluster(ncores)
 registerDoParallel(cl, cores=ncores)
 on.exit(stopCluster(cl))

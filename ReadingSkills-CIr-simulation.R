@@ -122,9 +122,9 @@ psifcn.beta <- function(theta){
 ## ----
 
 ## ----Defining file names-------------------------------------------------------
-filenamecoverage<-paste("CIr_coverage_psi",psi,"_rep",Rep,".txt",sep="")
-filenamemessage <- paste("CIr_message_psi",psi,"_rep",Rep,".txt",sep="")
-filenamefail <-paste("CIr_fail_psi",psi,"_rep",Rep,".txt",sep="")
+filenamecoverage<-paste("ReadingSkills_CIr_coverage_psi",psi,"_rep",Rep,".txt",sep="")
+filenamemessage <- paste("ReadingSkills_CIr_message_psi",psi,"_rep",Rep,".txt",sep="")
+filenamefail <-paste("ReadingSkills_CIr_fail_psi",psi,"_rep",Rep,".txt",sep="")
 
 beta<-c(1.1232,      -0.7416,       0.4864,      -0.5813)
 gamma<-c(3.304,        1.747,        1.229)

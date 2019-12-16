@@ -14,7 +14,7 @@
 # Rep - number of replicates
 prob<- 0.995
 psi <- 7
-Rep <- 10000
+Rep <- 3
 
 # See the working directory
 getwd() 
@@ -282,10 +282,10 @@ simula_hoaci <- function(s_vY, s_mX, s_mZ, parameter, psi, prob, r){
 }
 
 # ----Defining the file names---------------------------------------------------
-filenameestimates<<-paste("estimates_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
-filenamecoverage<<-paste("coverage_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
-filenamemessage <<-paste("message_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
-filenamefail    <<-paste("fail_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenameestimates<-paste("ReadingSkills_estimates_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamecoverage<-paste("ReadingSkills_coverage_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamemessage <-paste("ReadingSkills_message_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
+filenamefail    <-paste("ReadingSkills_fail_psi",psi,"_prob",prob*1000,"_Rep",Rep,".txt",sep="")
 
 ## ----Genereting samples--------------------------------------------------------
 beta<-c(1.1232, -0.7416, 0.4864, -0.5813)
@@ -323,7 +323,7 @@ start.time <- Sys.time()
 ## ----Alocating Processors------------------------------------------------------
 closeAllConnections()
 ncores <- detectCores()
-cat("\n ncores = ",ncores)
+cat("\n ncores = ",ncores,"\n\n")
 cl <- makeCluster(ncores)
 registerDoParallel(cl, cores=ncores)
 on.exit(stopCluster(cl))
@@ -348,12 +348,12 @@ tab <- foreach(r = 1:Rep, .combine = rbind, .packages=c('doParallel'), .export =
 }
 fails<-tab[tab[,1]==5,]
 validos<-tab[tab[,1]!=5,]
-estimates<-validos[,10:13]
+estimates<-validos[,14:19]
 coverage<-c((1-prob),mean(validos[,2])*100,mean(validos[,3])*100,mean(validos[,4])*100,mean(validos[,5])*100,mean(validos[,6])*100,mean(validos[,7])*100,mean(validos[,8])*100,mean(validos[,9])*100,mean(validos[,10])*100,mean(validos[,11]),mean(validos[,12]),mean(validos[,13]))
 
 # ----Saving the results-----------------------------------------------------------
 cat(paste("\n# fails : ",nrow(rbind(fails,c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)))-1), file = filenamefail, append = TRUE, sep = " ", fill = 100, labels = NULL)
-cat(estimates, file = filenameestimates, append = TRUE, sep = " ", fill = 100, labels = NULL)
+cat(t(estimates), file = filenameestimates, append = TRUE, sep = " ", fill = 100, labels = NULL)
 cat(c("       |----------------- coverage  --------------| |--------- length ---------|"), file = filenamecoverage, append = TRUE, sep = " ", fill = 100, labels = NULL)
 cat(c("1-prob MLEL MBRL QBRL MLEU MBRU QBRU MLEB MBRB QBRB    MLE       MBR       QBR"), file = filenamecoverage, append = TRUE, sep = " ", fill = 100, labels = NULL)
 cat(coverage, file = filenamecoverage, append = TRUE, sep = "  ", fill = 100, labels = NULL)
