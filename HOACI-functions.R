@@ -1,4 +1,6 @@
 # Pinheiro, Ferrari and Medeiros (2019) - Higher-order approximate confidence intervals
+#
+# Functions needed to HOACI-examples.R, ReadingSkills-simulation.R and HOACI-simulation-beta.R. 
 
 options(warn=-1)# turn off warnings
 # options(warn=0)# turn on warnings
@@ -15,15 +17,13 @@ require(tensorA)
 
 regressioncumulants<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
   
-  numpar<-length(parameter)
   y<-v
   X<-Nx
   Z<-Nz
   q<-ncol(X)
   m<-ncol(Z)
-  
-  nobs<-length(y)
-  
+  numpar<-q+m
+
   LINK<-link.matrix(parameter,X,Z,link.mu,link.phi)
   T<-as.vector(LINK[[1]])
   H<-as.vector(LINK[[2]])
@@ -118,7 +118,7 @@ regressioncumulants<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
       
       K4[t,s,,] <- rbind(cbind(bb2,bg2),cbind(t(bg2),gg2))
     }
-
+    
     for (s in 1:m ) {
       zs <- Z[,s]
       
@@ -136,7 +136,6 @@ regressioncumulants<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
       
       K4[t,(q+s),,] <- rbind(cbind(bb2,bg2),cbind(t(bg2),gg2))
     }
-    
   }
   
   for (t in 1:m ) {
@@ -157,7 +156,7 @@ regressioncumulants<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
       
       K4[(q+t),s,,] <- rbind(cbind(bb2,bg2),cbind(t(bg2),gg2))
     }
-
+    
     for (s in 1:m ) {
       zs <- Z[,s]
       
@@ -175,9 +174,7 @@ regressioncumulants<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
       
       K4[(q+t),(q+s),,] <- rbind(cbind(bb2,bg2),cbind(t(bg2),gg2))
     }
-    
   }
-  
   return(list(K2, K3, K4, Kab))
 }
 
@@ -186,7 +183,9 @@ profilecumulantsbeta<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
   #obtaining the cumulants of the profile likelihood of beta0 
   require(tensorA)
   
-  numpar<-length(parameter)
+  q<-ncol(Nx)
+  m<-ncol(Nz)
+  numpar<-q+m
   
   c<-regressioncumulants(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu)
   
@@ -196,7 +195,7 @@ profilecumulantsbeta<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
   Kab = c[[4]] # kappa_(parameter_i,parameter_jparameter_k)
   #///////////////////////////////////////////////////////////////////////////
   #///////////////////////////////////////////////////////////////////////////
-  Beta = rep(0,numpar-1) # beta_beta0^a  a={beta_1,...,beta_q,gamma_1,....gamma_m}
+  Beta = rep(NA_real_,numpar-1) # beta_beta0^a  a={beta_1,...,beta_q,gamma_1,....gamma_m}
   K2inv = solve(K2[-1,-1],tol=1e-100)
   Beta=K2[1,-1]%*%K2inv
   #///////////////////////////////////////////////////////////////////////////
@@ -210,13 +209,17 @@ profilecumulantsbeta<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
   C <- to.tensor(array(Beta),c(C=(numpar-1),E=1))
   D <- to.tensor(array(Beta),c(D=(numpar-1),E=1))
   
-  k1<- 0;
-  k1<- - 1/2 *sum( K2inv*( Kab[-1,-1,1] + K3[-1,-1,1] - apply((sweep(Kab[-1,-1,-1],3,Beta,FUN="*")),c(1,2),sum)
-                                                      - apply((sweep(K3 [-1,-1,-1],3,Beta,FUN="*")),c(1,2),sum)  )  )
+  if(q==1 & m==1){
+    k1<- 0;
+    k1<- - 1/2 *sum( K2inv*( Kab[-1,-1,1] + K3[-1,-1,1] - Kab[-1,-1,-1]*Beta - K3 [-1,-1,-1]*Beta  )  )
+  }else{
+    k1<- 0;
+    k1<- - 1/2 *sum( K2inv*( Kab[-1,-1,1] + K3[-1,-1,1] - apply((sweep(Kab[-1,-1,-1],3,Beta,FUN="*")),c(1,2),sum)
+                             - apply((sweep(K3 [-1,-1,-1],3,Beta,FUN="*")),c(1,2),sum)  )  )
+  }
   k2<-K2[1,1]- tcrossprod(Beta%*%K2[-1,-1],Beta)
   k3<-K3[1,1,1] - 3%*%Beta%*%K3[-1,1,1] + 3%*%tcrossprod(Beta%*%K3[-1,-1,1],Beta) - sum(K3tensor %e% A %e% B %e% C)
   k4<-K4[1,1,1,1] - 4%*%Beta%*%K4[-1,1,1,1] + 6%*%tcrossprod(Beta%*%K4[-1,-1,1,1],Beta) - 4%*%sum(K4tensor3 %e% A %e% B %e% C) + sum(K4tensor %e% A %e% B %e% C %e% D)
-  
   return(k=c(k1,k2,k3,k4))
 }
 
@@ -244,10 +247,16 @@ scoreQBRbeta<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u){
   
   U <- score(parameter, y, X, Z, link.phi, nu)
   
-  c(crossprod(X[,1]  ,T*U[,1]) + Mbeta(parameter, y, X, Z, cumulants, link.mu, link.phi, nu, up),
-    crossprod(X[,2:q],T*U[,1]),
-    crossprod(Z      ,H*U[,2])
-  )
+  if(q==1 & m==1){
+    c(crossprod(X[,1]  ,T*U[,1]) + Mbeta(parameter, y, X, Z, cumulants, link.mu, link.phi, nu, up),
+      crossprod(Z      ,H*U[,2])
+    )
+  }else{
+    c(crossprod(X[,1]  ,T*U[,1]) + Mbeta(parameter, y, X, Z, cumulants, link.mu, link.phi, nu, up),
+      crossprod(X[,2:q],T*U[,1]),
+      crossprod(Z      ,H*U[,2])
+    )
+  }
 }
 
 profilecumulantsgamma<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu){
@@ -255,9 +264,10 @@ profilecumulantsgamma<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu)
   #obtaining the cumulants of the profile likelihood of gamma0
   require(tensorA)
   
-  numpar<-length(parameter)
   q<-ncol(Nx)
-  
+  m<-ncol(Nz)
+  numpar<-q+m
+
   c<-regressioncumulants(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu)
   
   K2  = c[[1]] # kappa_(parameter_i,parameter_j)
@@ -278,10 +288,15 @@ profilecumulantsgamma<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu)
   B <- to.tensor(array(Beta),c(B=(numpar-1),E=1))
   C <- to.tensor(array(Beta),c(C=(numpar-1),E=1))
   D <- to.tensor(array(Beta),c(D=(numpar-1),E=1))
-  
-  k1=- 1/2 *sum( K2inv*( Kab[-(q+1),-(q+1),(q+1)] + K3[-(q+1),-(q+1),(q+1)]
-                         - apply((sweep(Kab[-(q+1),-(q+1),-(q+1)],3,Beta,FUN="*")),c(1,2),sum)
-                         - apply((sweep(K3 [-(q+1),-(q+1),-(q+1)],3,Beta,FUN="*")),c(1,2),sum) ) )
+
+  k1<- 0;
+  if(q==1 & m==1){
+    k1<- - 1/2 *sum( K2inv*( Kab[-(q+1),-(q+1),(q+1)] + K3[-(q+1),-(q+1),(q+1)] - Kab[-(q+1),-(q+1),-(q+1)]*Beta - K3 [-(q+1),-(q+1),-(q+1)]*Beta  )  )
+  }else{
+    k1=- 1/2 *sum( K2inv*( Kab[-(q+1),-(q+1),(q+1)] + K3[-(q+1),-(q+1),(q+1)]
+                           - apply((sweep(Kab[-(q+1),-(q+1),-(q+1)],3,Beta,FUN="*")),c(1,2),sum)
+                           - apply((sweep(K3 [-(q+1),-(q+1),-(q+1)],3,Beta,FUN="*")),c(1,2),sum) )  )
+  }
   k2<-K2[(q+1),(q+1)]- tcrossprod(Beta%*%K2[-(q+1),-(q+1)],Beta)
   k3<-K3[(q+1),(q+1),(q+1)] - 3%*%Beta%*%K3[-(q+1),(q+1),(q+1)] + 3%*%tcrossprod(Beta%*%K3[-(q+1),-(q+1),(q+1)],Beta) - sum(K3tensor %e% A %e% B %e% C)
   k4<-K4[(q+1),(q+1),(q+1),(q+1)] - 4%*%Beta%*%K4[-(q+1),(q+1),(q+1),(q+1)] + 6%*%tcrossprod(Beta%*%K4[-(q+1),-(q+1),(q+1),(q+1)],Beta) - 4%*%sum(K4tensor3 %e% A %e% B %e% C) + sum(K4tensor %e% A %e% B %e% C %e% D)
@@ -296,7 +311,7 @@ Mgamma<-function(parameter,v,Nx,Nz,cumulants,link.mu,link.phi,nu,u){ #recebe os 
 }
 
 scoreQBRgamma<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u){
-  numpar<-length(parameter)
+
   y<-array(v)
   nobs<-length(y)
   y<-matrix(y,nobs,1)
@@ -306,13 +321,14 @@ scoreQBRgamma<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u)
   
   q<-ncol(X)
   m<-ncol(Z)
+  numpar<-q+m
   
   LINK<-link.matrix(parameter,X,Z,link.mu,link.phi)
   T<-as.vector(LINK[[1]])
   H<-as.vector(LINK[[2]])
   
   U <- score(parameter, y, X, Z, link.phi, nu)
-  
+
   if(m==1){
     c(crossprod(X    ,T*U[,1]),
       crossprod(Z[,1],H*U[,2]) + Mgamma(parameter, y, X, Z,cumulants,link.mu,link.phi,nu,up)
@@ -329,7 +345,6 @@ scoreQBRgamma<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u)
 QBRE<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u){
   require(nleqslv)
   
-  numpar<-length(parameter)
   y<-v
   nobs<-length(y)
   y<-matrix(y,nobs,1)
@@ -338,100 +353,170 @@ QBRE<-function(parameter,v,Nx,Nz,score,cumulants,link.mu,link.phi,nu,u){
   
   q<-ncol(X)
   m<-ncol(Z)
+  numpar<-q+m
   
   beta <-parameter[1:q]
   gamma<-parameter[(q+1):numpar]
   nobs<-length(y)
   iota =  matrix(rep(1,nobs),nobs,1);
   
-  if(psi<=q){
-    #---------------------------------------------------
-    #---------------------------------------------------
-    # beta
+  if(psi<=q){# beta
     Xpsi <- cbind(X[,psi],X[,-psi])
     
-    # MBRE
-    p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
-      cat(paste0("\nQBRM beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      QBRM <- NaN
-    }else{QBRM <- ans$x[1]}
-    
-    # CI upper limit QBRE
-    up<- -u
-    p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
-      p<-c(parameter[psi],parameter[-psi]) # initial guess : MLE
-      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    }
-    if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
-      cat(paste0("\nQBRU beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      QBRU <- NaN
-    }else{QBRU <- ans$x[1]}
-    if(ans$termcd == 3)cat(paste0("\nQBRU beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
-    
-    # CI lower limit QBRE
-    up<- u
-    p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
+    if(q==1 & m==1){
+      # MBRE
       p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
-      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    }
-    if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
-      cat(paste0("\nQBRL beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      QBRL <- NaN
-    }else{QBRL <- ans$x[1]}
-    if(ans$termcd == 3)cat(paste0("\nQBRL beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        cat(paste0("\nQBRM beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRM <- NaN
+      }else{QBRM <- ans$x[1]}
+      
+      # CI upper limit QBRE
+      up<- -u
+      p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(parameter[psi],parameter[-psi]) # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRU beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRU <- NaN
+      }else{QBRU <- ans$x[1]}
+      if(ans$termcd == 3)cat(paste0("\nQBRU beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+      
+      # CI lower limit QBRE
+      up<- u
+      p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRL beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRL <- NaN
+      }else{QBRL <- ans$x[1]}
+      if(ans$termcd == 3)cat(paste0("\nQBRL beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+    }else{
+      # MBRE
+      p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        cat(paste0("\nQBRM beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRM <- NaN
+      }else{QBRM <- ans$x[1]}
+      
+      # CI upper limit QBRE
+      up<- -u
+      p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(parameter[psi],parameter[-psi]) # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRU beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRU <- NaN
+      }else{QBRU <- ans$x[1]}
+      if(ans$termcd == 3)cat(paste0("\nQBRU beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+      
+      # CI lower limit QBRE
+      up<- u
+      p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(parameter[psi],parameter[-psi])  # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRbeta, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRL beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRL <- NaN
+      }else{QBRL <- ans$x[1]}
+      if(ans$termcd == 3)cat(paste0("\nQBRL beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+    }    
     
+  }else{# (psi>q) gamma
     
-  }else{
-    #---------------------------------------------------
-    #---------------------------------------------------
-    # (psi>q) gamma
     if(m==1)Zpsi <- iota else Zpsi <- cbind(Z[,(psi-q)],Z[,-(psi-q)])
-    
-    # MBRE
-    p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
-      if(m==1)cat(paste("\nQBRM phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      else    cat(paste0("\nQBRM gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warnings.txt",append=T)
-      QBRM <- NaN
-    }else{QBRM <- ans$x[(q+1)]}
-    
-    # CI upper limit QBRE
-    up<- -u
-    p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
+
+    if(q==1 & m==1){
+      # MBRE
+      p<-parameter  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        cat(paste0("\nQBRM beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRM <- NaN
+      }else{QBRM <- ans$x[2]}
+      # CI upper limit QBRE
+      up<- -u
+      p<-parameter  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-parameter # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,Xpsi,Z,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRU beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRU <- NaN
+      }else{QBRU <- ans$x[2]}
+      if(ans$termcd == 3)cat(paste0("\nQBRU beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+      
+      # CI lower limit QBRE
+      up<- u
+      p<-parameter  # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-parameter  # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        cat(paste0("\nQBRL beta_",(psi-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRL <- NaN
+      }else{QBRL <- ans$x[2]}
+      if(ans$termcd == 3)cat(paste0("\nQBRL beta_",(psi-1),"  : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+    }else{
+      # MBRE
       p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
-      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    }
-    if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
-      if(m==1)cat(paste("\nQBRU phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      else    cat(paste0("\nQBRU gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      QBRU <- NaN
-    }else{QBRU <- ans$x[(q+1)]}
-    if(ans$termcd == 3)cat(paste0("\nQBRU gamma_",((psi-q)-1)," : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
-    
-    # CI lower limit QBRE
-    up<- u
-    p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
-    ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
-    if(inherits(ans, "try-error") || ans$termcd != 1){
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=500),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,qnorm(0.5)),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        if(m==1)cat(paste("\nQBRM phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        else    cat(paste0("\nQBRM gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warnings.txt",append=T)
+        QBRM <- NaN
+      }else{QBRM <- ans$x[(q+1)]}
+      
+      # CI upper limit QBRE
+      up<- -u
       p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
-      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        if(m==1)cat(paste("\nQBRU phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        else    cat(paste0("\nQBRU gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRU <- NaN
+      }else{QBRU <- ans$x[(q+1)]}
+      if(ans$termcd == 3)cat(paste0("\nQBRU gamma_",((psi-q)-1)," : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
+      
+      # CI lower limit QBRE
+      up<- u
+      p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
+      ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",control=list(trace=0,maxit=50),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      if(inherits(ans, "try-error") || ans$termcd != 1){
+        p<-c(beta,gamma[(psi-q)],gamma[-(psi-q)]) # initial guess : MLE
+        ans<-try(nleqslv(p, scoreQBRgamma, jac=NULL, method="Newton",global="hook",control=list(trace=0,maxit=100,allowSingular=T),y,X,Zpsi,score,cumulants,link.mu,link.phi,nu,up),TRUE)
+      }
+      if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
+        if(m==1)cat(paste("\nQBRL phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        else    cat(paste0("\nQBRL gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
+        QBRL <- NaN
+      }else{QBRL <- ans$x[(q+1)]}
+      if(ans$termcd == 3)
+        cat(paste0("\nQBRL gamma_",((psi-q)-1)," : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
     }
-    if(inherits(ans, "try-error") || (ans$termcd != 1 && ans$termcd != 3)){
-      if(m==1)cat(paste("\nQBRL phi error convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      else    cat(paste0("\nQBRL gamma_",((psi-q)-1)," convergence termination code : ",ans$termcd),file="warning.txt",append=T)
-      QBRL <- NaN
-    }else{QBRL <- ans$x[(q+1)]}
-    if(ans$termcd == 3)
-      cat(paste0("\nQBRL gamma_",((psi-q)-1)," : No better point found (algorithm has stalled)"),file="warning.txt",append=T)
   }
   return(c(QBRM,QBRL,QBRU))
 }
@@ -570,6 +655,7 @@ beta_score<-function(parameter,v,Nx,Nz,link.phi,nu){
   Z<-Nz
   q<-ncol(X)
   m<-ncol(Z)
+  numpar<-q+m
   beta <-parameter[1:q]
   gamma<-parameter[(q+1):numpar]
   
@@ -578,10 +664,11 @@ beta_score<-function(parameter,v,Nx,Nz,link.phi,nu){
   
   eta <- X%*%beta 
   mu <- exp(eta) / (1.0 + exp(eta))
-
+  
   delta <- Z%*%gamma
-  phi<-exp(delta);
-
+  if(link.phi=="identity")phi<-delta
+  else phi<-exp(delta);
+  
   ystar = log( y / (iota - y) );
   mustar = psigamma(mu*phi, 0) - psigamma((iota - mu)*phi, 0);
   ydag = log(iota-y);
@@ -607,7 +694,8 @@ beta_cumulants<-function(parameter,v,Nx,Nz,link.phi,nu){
   mu <- exp(eta) / (1.0 + exp(eta))
   
   delta <- Z%*%gamma
-  phi<-exp(delta)
+  if(link.phi=="identity")phi<-delta
+  else phi<-exp(delta)
   
   K22   = phi^2*(     psigamma(mu*phi,1) +          psigamma((1-mu)*phi,1) )                 #K22=K_mu,mu
   K21   = phi  *(mu  *psigamma(mu*phi,1) - (1-mu)  *psigamma((1-mu)*phi,1) )                 #K21=K_mu,phi
@@ -636,7 +724,7 @@ beta_cumulants<-function(parameter,v,Nx,Nz,link.phi,nu){
 
 beta_mle<-function(formula,data,link.mu,link.phi,nu){
   
-  r<-betareg(formula, data, link.phi="log", x = TRUE, y = TRUE)
+  r<-betareg(formula, data, link.phi=link.phi, x = TRUE, y = TRUE)
   
   if(r$optim$convergence != 0){
     print("no convergence in betareg")
@@ -650,17 +738,18 @@ beta_mle<-function(formula,data,link.mu,link.phi,nu){
 }
 
 ###########################################  
-# functions for t-Student distribution
+# functions for Student-t distribution
 ###########################################  
 
 t_score<-function(parameter,v,Nx,Nz,link.phi,nu){
   
-  numpar<-length(parameter)
   y<-v
   X<-Nx
   Z<-Nz
   q<-ncol(X)
-  # m<-ncol(Z)
+  m<-ncol(Z)
+  numpar<-q+m
+  
   beta <-parameter[1:q]
   gamma<-parameter[(q+1):numpar]
   
@@ -723,10 +812,10 @@ t_cumulants<-function(parameter,v,Nx,Nz,link.phi,nu){
   del40000 = -3*del21000
   del40002 = 15*(nu+1)^3/((nu+3)*(nu+5)*(nu+7)) 
   del40004 = (105*(nu+1)^3)/((7+nu)*(5+nu)*(3+nu))
-
-  K22 = (del20000/phi^2)       #K22=K_mu,mu
-  K21 = 0*iota                 #K21=K_mu,phi
-  K20 = ((del20002-1)/phi^2)   #K20=K_phi,phi
+  
+  K22 = (del20000/phi^2)*iota     #K22=K_mu,mu
+  K21 = 0*iota                    #K21=K_mu,phi
+  K20 = ((del20002-1)/phi^2)*iota #K20=K_phi,phi
   
   K33 = 0*iota                 #K33=K_mu,mu,mu 
   K32 = (2*del11001/phi^3)     #K32=K_mu,mu,phi
@@ -747,20 +836,25 @@ t_cumulants<-function(parameter,v,Nx,Nz,link.phi,nu){
   K41 = 1000*iota # this quantity is not necessary because mu and phi are orthogonal
   
   K40 = ((del40004+4*del30003+12*del20002-3*del20002^2-6)/phi^4) #K40=K_phi,phi,phi,phi
-
-  Kmu2  = 0*iota                          #Kmu2=K_mu,mumu 
+  
+  Kmu2  = 0*iota                          #Kmu2=K_mu,mumu
   Kmu1  = (del01000-del11001)/phi^3       #Kmu1=K_mu,muphi
   Kmu0  = 0*iota                          #Kmu0=K_mu,phiphi     
-  Kphi2 = (del00101/phi^3)                #Kphi2=K_phi,mumu   
-  Kphi1 = 0*iota                          #Kphi1=K_phi,muphi                    
+  Kphi2 = (del00101/phi^3)*iota           #Kphi2=K_phi,mumu   
+  Kphi1 = 0*iota                          #Kphi1=K_phi,muphi
   Kphi0 = ((4*del01002+del00103-2)/phi^3) #Kphi0=K_phi,phiphi
   
   return(list(K22,K21,K20,K33,K32,K31,K30,K44,K43,K42,K41,K40,Kmu2,Kmu1,Kmu0,Kphi2,Kphi1,Kphi0))
 }
 
-t_mle<-function(formula,data,link.phi,nu){
-  
-  r <- ssym.l(formula , family='Student', link.phi="log", xi=nu)
+t_mle<-function(formula,data,link.mu,link.phi,nu){
+
+  if ( (length(formula)[1L] < 2L) & (ncol(model.matrix(formula))<2L) ){
+    r <- ssym.l(formula , family='Student', xi=nu, link.phi="log", data=data)  
+  }
+  else{
+    r <- ssym.l(formula , family='Student', xi=nu, link.phi="log")    
+  }
   
   betahat <- coefficients(r)$mu
   if(link.phi=="identity"){
@@ -790,7 +884,7 @@ main<-function (formula,data,CL,mle,score,cumulants,link.mu,link.phi,nu){
   prob<-CL+(1-CL)/2
   u<-qnorm(prob)
   
-  MLE <- mle(formula,data,link.phi,nu)
+  MLE <- mle(formula,data,link.mu,link.phi,nu)
   
   thetahat <- MLE[[1]]
   y        <- MLE[[2]]
@@ -830,23 +924,29 @@ main<-function (formula,data,CL,mle,score,cumulants,link.mu,link.phi,nu){
     
     lengthEMV <-	MLEU - MLEL;
   }
-  
   #---------------------------------------------------
   # Quantile bias reduction estimate 
   #---------------------------------------------------
-  # Alocar Processadores ----
-  closeAllConnections()
-  ncores <- detectCores()
-  cl <- makeCluster(ncores)
-  registerDoParallel(cl, cores=ncores)
-  cat("\ncores = ",getDoParWorkers(),"\n")
-  on.exit(stopCluster(cl))
-  
-  tab <- foreach(psi = 1:numpar, .combine = rbind, .packages=c('doParallel'), .export = ls(globalenv())) %dopar% {
-    result<-QBRE(parameter = thetahat, v = y, Nx = X, Nz = Z, score = score, cumulants = cumulants ,link.mu = link.mu, link.phi = link.phi, nu = nu,  u = u)
-    return(result)
+  if(q==1 & m==1){ # iid sample
+    tab<-matrix(NA_real_,numpar,3)
+    for(i in 1:numpar){
+      psi<<-i
+      tab[i,]<-QBRE(parameter = thetahat, v = y, Nx = X, Nz = Z, score = score, cumulants = cumulants ,link.mu = link.mu, link.phi = link.phi, nu = nu,  u = u)  
+    }
+  }else{
+    # Alocar Processadores ----
+    closeAllConnections()
+    ncores <- detectCores()
+    cl <- makeCluster(ncores)
+    registerDoParallel(cl, cores=ncores)
+    cat("\ncores = ",getDoParWorkers(),"\n")
+    on.exit(stopCluster(cl))
+    
+    tab <- foreach(psi = 1:numpar, .combine = rbind, .packages=c('doParallel'), .export = ls(globalenv())) %dopar% {
+      result<-QBRE(parameter = thetahat, v = y, Nx = X, Nz = Z, score = score, cumulants = cumulants ,link.mu = link.mu, link.phi = link.phi, nu = nu,  u = u)
+      return(result)
+    }
   }
-  
   QBRL <- tab[,2]
   QBRU <- tab[,3]
   lengthQBR <-	QBRU - QBRL
@@ -975,6 +1075,6 @@ hoaci<-function (formula, data, CL, subset, na.action, weights, offset,
   offset <- list(mean = offsetX, precision = offsetZ)
   
   cat(paste("\nWait....") )
-
+  
   main(formula, data, CL, mle, score, cumulants, link.mu, link.phi, nu)
 }

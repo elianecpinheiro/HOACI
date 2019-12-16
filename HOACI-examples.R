@@ -49,12 +49,14 @@ orange
 length(density)
 
 # link.phi="identity"
-hoaci(density ~ arabic_gum + orange_oil, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
+hoaci(density ~ arabic_gum + orange_oil,            data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
 # link.phi="log"
-hoaci(density ~ arabic_gum + orange_oil, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
-
+hoaci(density ~ arabic_gum + orange_oil,            data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
 hoaci(density ~ arabic_gum + orange_oil|arabic_gum, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
 hoaci(density ~ arabic_gum + orange_oil|orange_oil, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
+
+# iid
+hoaci(density ~ 1,                                  data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
 
 #***********************************************************************
 #***********************************************************************
@@ -68,6 +70,11 @@ data("ReadingSkills", package = "betareg")
 r<-betareg(accuracy ~ dyslexia * iq | dyslexia + iq, data = ReadingSkills, x=TRUE)
 summary(r)
 hoaci(accuracy ~ dyslexia * iq | dyslexia + iq, data = ReadingSkills, CL=0.95, mle=beta_mle, score=beta_score, cumulants=beta_cumulants, link.mu="logit", link.phi="log", type="beta", nu=NULL)
+
+# iid
+r<-betareg(accuracy ~ 1, data = ReadingSkills, x=TRUE)
+summary(r)
+hoaci(accuracy ~ 1, data = ReadingSkills, CL=0.95, mle=beta_mle, score=beta_score, cumulants=beta_cumulants, link.mu="logit", link.phi="identity", type="beta", nu=NULL)
 
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
@@ -136,7 +143,7 @@ hoaci(y~x1+x2, CL=0.95, mle=beta_mle, score=beta_score, cumulants=beta_cumulants
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
-# Kieschnick, R & McCullough, B. D.(2003)
+# Kieschnick, R. & McCullough, B. D.(2003)
 # Regression analysis of variates observed on (0,1): percentages, proportions and fractions
 # Statistical Modelling, 3, 193-213
 dados<-read.table("voting.dat")
