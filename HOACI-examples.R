@@ -49,12 +49,13 @@ names(orange)<-c("density","arabic_gum","orange_oil")
 orange
 length(density)
 
-# link.phi="identity"
-hoaci(density ~ arabic_gum + orange_oil,            data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
 # link.phi="log"
 hoaci(density ~ arabic_gum + orange_oil,            data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
 hoaci(density ~ arabic_gum + orange_oil|arabic_gum, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
 hoaci(density ~ arabic_gum + orange_oil|orange_oil, data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="log", type="Student", nu=3)
+# link.phi="identity"
+hoaci(density ~ arabic_gum + orange_oil,            data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
+hoaci(density ~ arabic_gum,                         data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)
 
 # iid
 hoaci(density ~ 1,                                  data=orange, CL=0.95, mle=t_mle, score=t_score, cumulants=t_cumulants, link.mu="identity", link.phi="identity", type="Student", nu=3)

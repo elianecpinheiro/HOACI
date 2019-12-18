@@ -849,12 +849,7 @@ t_cumulants<-function(parameter,v,Nx,Nz,link.phi,nu){
 
 t_mle<-function(formula,data,link.mu,link.phi,nu){
 
-  if ( (length(formula)[1L] < 2L) & (ncol(model.matrix(formula))<2L) ){
-    r <- ssym.l(formula , family='Student', xi=nu, link.phi="log", data=data)  
-  }
-  else{
-    r <- ssym.l(formula , family='Student', xi=nu, link.phi="log")    
-  }
+  r <- ssym.l(formula , family='Student', xi=nu, link.phi="log", data=data)
   
   betahat <- coefficients(r)$mu
   if(link.phi=="identity"){
